@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEON VOID — Endless Bullet Hell</title>
+<style>
+:root{color-scheme:dark;--cyan:#5efcff;--pink:#ff4da6;--violet:#a78bfa;--bg:#050712}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#eafaff}
+body{display:grid;place-items:center}
+#shell{position:relative;width:min(100vw,160vh);height:min(100vh,62.5vw);min-height:360px;background:#050712;overflow:hidden;box-shadow:0 0 70px #0c466855}
+canvas{display:block;width:100%;height:100%;background:radial-gradient(ellipse at 50% 45%,#101b36 0%,#080c1c 48%,#03050c 100%)}
+.hud{position:absolute;inset:0;pointer-events:none}
+.topbar{position:absolute;left:22px;right:22px;top:18px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;text-shadow:0 0 12px #5efcff66}
+.brand{font-size:clamp(11px,1.3vw,16px);letter-spacing:.28em;color:var(--cyan);font-weight:800}
+.sub{font-size:10px;letter-spacing:.16em;color:#7897b9;margin-top:5px}
+.statrow{display:flex;gap:clamp(10px,2vw,28px);text-align:right}
+.stat label{display:block;font-size:9px;letter-spacing:.2em;color:#7f9cb9;margin-bottom:5px}
+.stat strong{font-size:clamp(14px,2vw,23px);font-weight:700;color:#f3fbff}
+.stat strong.cyan{color:var(--cyan)}.stat strong.pink{color:var(--pink)}
+.bottom{position:absolute;left:22px;right:22px;bottom:17px;display:flex;justify-content:space-between;align-items:end;color:#7d95b1;font-size:10px;letter-spacing:.12em}
+.keys{display:flex;gap:6px;align-items:center}.key{border:1px solid #31516c;border-bottom-width:2px;border-radius:4px;padding:4px 6px;color:#b9d8e8;background:#091323}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(90deg,#030611a8,#060a18c9,#030611a8);backdrop-filter:blur(5px);pointer-events:auto}
+.panel{width:min(440px,88%);padding:clamp(22px,4vw,40px);border:1px solid #3c7990;background:linear-gradient(145deg,#0d1a2bea,#080d1bed);box-shadow:0 0 45px #24d9ff1b,inset 0 0 35px #3c86a00c;position:relative}
+.panel:before,.panel:after{content:"";position:absolute;width:18px;height:18px;border-color:var(--cyan);border-style:solid}
+.panel:before{left:-1px;top:-1px;border-width:2px 0 0 2px}.panel:after{right:-1px;bottom:-1px;border-width:0 2px 2px 0}
+.eyebrow{font-size:10px;color:var(--pink);letter-spacing:.28em;margin-bottom:14px}
+h1{font-size:clamp(30px,5vw,48px);line-height:.95;letter-spacing:-.05em;margin:0;color:#f1fbff;text-shadow:0 0 25px #5efcff40}
+h1 span{color:var(--cyan)}
+.desc{font-size:12px;line-height:1.9;color:#9bb5cc;margin:20px 0}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0 24px}
+.control{border:1px solid #203d56;padding:10px;background:#07101e;color:#a8c3d7;font-size:10px;line-height:1.8}
+.control b{display:block;color:#e6f8ff;font-size:11px;margin-bottom:2px}
+button{width:100%;border:0;background:var(--cyan);color:#031018;font:800 12px ui-monospace,monospace;letter-spacing:.2em;padding:15px;cursor:pointer;transition:.15s;box-shadow:0 0 24px #5efcff30}
+button:hover{background:#b3ffff;transform:translateY(-1px);box-shadow:0 0 30px #5efcff65}
+.smallnote{text-align:center;color:#65839e;font-size:9px;letter-spacing:.1em;margin-top:13px}
+.hidden{display:none!important}
+@media(max-width:560px){.topbar{left:12px;right:12px;top:12px}.bottom{left:12px;right:12px;bottom:10px}.sub{font-size:8px}.stat label{font-size:8px}.keys{gap:3px}.key{padding:3px 4px}.bottom{font-size:8px}}
+</style>
+</head>
+<body>
+<div id="shell">
+<canvas id="game" aria-label="弾幕避けゲーム"></canvas>
+<div class="hud">
+  <div class="topbar">
+    <div><div class="brand">N E O N / V O I D</div><div class="sub">ENDLESS SURVIVAL PROTOCOL</div></div>
+    <div class="statrow">
+      <div class="stat"><label>SURVIVED</label><strong id="time">00:00</strong></div>
+      <div class="stat"><label>SCORE</label><strong class="cyan" id="score">000000</strong></div>
+      <div class="stat"><label>BEST</label><strong class="pink" id="best">000000</strong></div>
+    </div>
+  </div>
+  <div class="bottom"><div id="phase">SYSTEM STANDBY</div><div class="keys"><span class="key">WASD</span><span class="key">/</span><span class="key">↑↓←→</span><span>MOVE</span><span class="key">SHIFT</span><span>FOCUS</span><span class="key">P</span><span>PAUSE</span></div></div>
+</div>
+<div id="overlay" class="overlay">
+  <section class="panel" id="titlePanel">
+    <div class="eyebrow">● SURVIVAL SIMULATION / 001</div>
+    <h1>NEON<br><span>VOID</span></h1>
+    <p class="desc">弾幕の隙間を抜け、限界まで生き残れ。<br>時間が経つほど、世界は容赦なく加速する。</p>
+    <div class="controls">
+      <div class="control"><b>MOVE / 移動</b>W A S D または矢印キー</div>
+      <div class="control"><b>FOCUS / 精密移動</b>Shift を押しながら移動</div>
+      <div class="control"><b>PAUSE / 一時停止</b>P または Esc</div>
+      <div class="control"><b>OBJECTIVE / 目的</b>弾に触れず、生き残る</div>
+    </div>
+    <button id="startBtn">START SURVIVAL　↗</button>
+    <div class="smallnote">NO WEAPONS. NO MERCY. JUST YOU.</div>
+  </section>
+  <section class="panel hidden" id="overPanel">
+    <div class="eyebrow">× CONNECTION TERMINATED</div>
+    <h1>GAME<br><span>OVER</span></h1>
+    <p class="desc" id="resultText">生存時間 00:00</p>
+    <div class="controls">
+      <div class="control"><b>FINAL SCORE</b><span id="finalScore">000000</span></div>
+      <div class="control"><b>BEST SCORE</b><span id="finalBest">000000</span></div>
+    </div>
+    <button id="retryBtn">RETRY　↻</button>
+    <div class="smallnote">THE VOID IS WAITING.</div>
+  </section>
+  <section class="panel hidden" id="pausePanel">
+    <div class="eyebrow">Ⅱ SIMULATION SUSPENDED</div>
+    <h1>PAU<span>SED</span></h1>
+    <p class="desc">呼吸を整えろ。弾幕は待ってくれない。</p>
+    <button id="resumeBtn">RESUME　▶</button>
+    <div class="smallnote">PRESS P OR ESC TO CONTINUE</div>
+  </section>
+</div>
+</div>
+<script>
+(()=>{
+'use strict';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+const overlay=$('overlay'),titlePanel=$('titlePanel'),overPanel=$('overPanel'),pausePanel=$('pausePanel');
+let W=960,H=600,dpr=1,last=0,elapsed=0,score=0,best=+(localStorage.getItem('neonVoidBest')||0);
+let state='title',player,bullets=[],particles=[],stars=[],emitters=[],spawnClock=0,patternClock=0,shake=0;
+$('best').textContent=String(best).padStart(6,'0');
+const keys=new Set();
+function resize(){
+ const r=$('shell').getBoundingClientRect();dpr=Math.min(devicePixelRatio||1,2);
+ W=Math.max(320,r.width);H=Math.max(360,r.height);
+ canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+ if(player){player.x=Math.min(W-18,Math.max(18,player.x));player.y=Math.min(H-28,Math.max(60,player.y))}
+ stars=Array.from({length:Math.floor(W*H/6500)},()=>({x:Math.random()*W,y:Math.random()*H,z:.3+Math.random()*1.7,r:Math.random()*1.3}));
+}
+addEventListener('resize',resize);resize();
+function reset(){
+ elapsed=0;score=0;bullets=[];particles=[];spawnClock=0;patternClock=0;shake=0;
+ player={x:W/2,y:H*.78,r:6,speed:245,invuln:1};
+ $('score').textContent='000000';$('time').textContent='00:00';$('phase').textContent='THREAT LEVEL 01';
+}
+function show(which){titlePanel.classList.add('hidden');overPanel.classList.add('hidden');pausePanel.classList.add('hidden');if(which)which.classList.remove('hidden');overlay.classList.toggle('hidden',!which)}
+function start(){reset();state='playing';show(null);last=performance.now()}
+function pause(){if(state==='playing'){state='paused';show(pausePanel)}else if(state==='paused'){state='playing';show(null);last=performance.now()}}
+function endGame(){
+ state='over';shake=14;best=Math.max(best,score);localStorage.setItem('neonVoidBest',best);
+ $('best').textContent=String(best).padStart(6,'0');$('finalBest').textContent=String(best).padStart(6,'0');
+ $('finalScore').textContent=String(score).padStart(6,'0');
+ $('resultText').textContent=`生存時間 ${formatTime(elapsed)} — ${elapsed<15?'まだ始まったばかりだ。':'見事な生存記録だ。'} 次はもっと先へ。`;
+ show(overPanel);
+}
+function formatTime(t){let s=Math.floor(t);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+$('startBtn').onclick=start;$('retryBtn').onclick=start;$('resumeBtn').onclick=pause;
+addEventListener('keydown',e=>{
+ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift'].includes(e.key))e.preventDefault();
+ keys.add(e.key.toLowerCase());
+ if((e.key.toLowerCase()==='p'||e.key==='Escape')&&(state==='playing'||state==='paused'))pause();
+ if((state==='title'||state==='over')&&(e.key==='Enter'||e.key===' '))start();
+});
+addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+addEventListener('blur',()=>{keys.clear();if(state==='playing')pause()});
+function particle(x,y,color,n=8,power=90){
+ for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=Math.random()*power;
+ particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.25+Math.random()*.65,max:.9,size:1+Math.random()*2,color})}
+}
+function bullet(x,y,a,speed,r=4,color='#ff4da6'){
+ bullets.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,r,color,trail:[]});
+}
+function aimed(x,y,speed,offset=0){return Math.atan2(player.y-y,player.x-x)+offset}
+function fireFan(x,y,count,spread,speed,aim,color){
+ for(let i=0;i<count;i++){let a=aim+(count===1?0:(i/(count-1)-.5)*spread);bullet(x,y,a,speed,3.3,color)}
+}
+function fireRing(x,y,count,speed,offset,color){
+ for(let i=0;i<count;i++)bullet(x,y,Math.PI*2*i/count+offset,speed,3.1,color)
+}
+function spawnPatterns(dt){
+ spawnClock+=dt;patternClock+=dt;
+ const difficulty=1+Math.min(elapsed/45,2.8);
+ if(spawnClock>.9/difficulty){
+  spawnClock=0;
+  const type=Math.floor(Math.random()*4),x=40+Math.random()*(W-80),y=-12;
+  if(type===0){
+   const a=aimed(x,y,100);fireFan(x,y,5+Math.floor(difficulty*2),.9,105+elapsed*1.5,a,'#ff4da6');
+  }else if(type===1){
+   const count=9+Math.floor(difficulty*3);fireRing(x,Math.min(H*.35,75+Math.random()*H*.2),count,75+elapsed*.65,Math.random()*6,'#a78bfa');
+  }else if(type===2){
+   for(let i=0;i<3;i++)bullet(Math.random()*W,-10,Math.PI/2+(Math.random()-.5)*.18,100+elapsed*1.1,4,'#5efcff');
+  }else{
+   let xx=Math.random()<.5?30:W-30;fireFan(xx,y,4+Math.floor(difficulty),.65,115+elapsed,aimed(xx,y,100),'#ffb45e');
+  }
+ }
+ if(patternClock>6.5){patternClock=0;let y=65+Math.random()*Math.min(110,H*.2);fireRing(W/2,y,13+Math.floor(difficulty*2),63+elapsed*.45,Math.random(),'#5efcff')}
+}
+function update(dt){
+ if(state!=='playing')return;
+ elapsed+=dt;score=Math.floor(elapsed*100+Math.max(0,elapsed-20)*20);
+ const f=keys.has('shift')?0.43:1,s=player.speed*f;
+ let dx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
+ let dy=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);
+ const len=Math.hypot(dx,dy)||1;player.x+=dx/len*s*dt;player.y+=dy/len*s*dt;
+ player.x=Math.max(14,Math.min(W-14,player.x));player.y=Math.max(55,Math.min(H-18,player.y));
+ player.invuln=Math.max(0,player.invuln-dt);
+ spawnPatterns(dt);
+ for(let i=bullets.length-1;i>=0;i--){
+  let b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;
+  if(b.x<-40||b.x>W+40||b.y<-50||b.y>H+50){bullets.splice(i,1);continue}
+  if(player.invuln<=0&&Math.hypot(b.x-player.x,b.y-player.y)<b.r+player.r-1){
+   particle(player.x,player.y,'#5efcff',32,210);endGame();return;
+  }
+ }
+ for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.pow(.05,dt);p.vy*=Math.pow(.05,dt);p.life-=dt;if(p.life<=0)particles.splice(i,1)}
+ for(let st of stars){st.y+=(18+st.z*38)*dt;if(st.y>H){st.y=0;st.x=Math.random()*W}}
+ $('score').textContent=String(score).padStart(6,'0');$('time').textContent=formatTime(elapsed);
+ $('phase').textContent=`THREAT LEVEL ${String(1+Math.floor(elapsed/18)).padStart(2,'0')}  /  ${bullets.length} ACTIVE PROJECTILES`;
+}
+function glow(color,blur){ctx.shadowColor=color;ctx.shadowBlur=blur}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ // subtle grid and scrolling stars
+ ctx.save();ctx.strokeStyle='#18304a33';ctx.lineWidth=1;
+ const grid=40,offset=(elapsed*14)%grid;
+ for(let x=0;x<W;x+=grid){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+ for(let y=-grid+offset;y<H;y+=grid){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+ for(let st of stars){ctx.globalAlpha=.25+st.z*.28;ctx.fillStyle=st.z>1.5?'#8afaff':'#7693c4';ctx.fillRect(st.x,st.y,st.z,st.z*2.2)}
+ ctx.globalAlpha=1;ctx.restore();
+ // edge vignette
+ let vg=ctx.createRadialGradient(W/2,H/2,H*.1,W/2,H/2,Math.max(W,H)*.72);vg.addColorStop(0,'#00000000');vg.addColorStop(1,'#01030bcc');ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+ for(const b of bullets){
+  ctx.save();glow(b.color,13);ctx.globalAlpha=.18;ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(b.x,b.y,b.r*2.5,0,Math.PI*2);ctx.fill();
+  ctx.globalAlpha=1;ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(b.x-b.r*.25,b.y-b.r*.25,b.r*.36,0,Math.PI*2);ctx.fill();ctx.restore();
+ }
+ for(const p of particles){ctx.save();ctx.globalAlpha=Math.max(0,p.life/p.max);glow(p.color,10);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.restore()}
+ if(player){
+  ctx.save();ctx.translate(player.x,player.y);
+  const flashing=player.invuln>0&&Math.floor(performance.now()/80)%2===0;
+  if(!flashing){
+   glow('#5efcff',20);
+   ctx.fillStyle='#5efcff';ctx.beginPath();ctx.moveTo(0,-13);ctx.lineTo(9,9);ctx.lineTo(0,5);ctx.lineTo(-9,9);ctx.closePath();ctx.fill();
+   ctx.shadowBlur=0;ctx.fillStyle='#f2ffff';ctx.beginPath();ctx.moveTo(0,-7);ctx.lineTo(3,4);ctx.lineTo(0,2);ctx.lineTo(-3,4);ctx.closePath();ctx.fill();
+   if(keys.has('shift')){ctx.strokeStyle='#5efcff88';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,15+Math.sin(performance.now()/80)*1.5,0,Math.PI*2);ctx.stroke()}
+  }
+  ctx.restore();
+  // tiny hitbox indicator while focused
+  if(keys.has('shift')){ctx.save();glow('#ffffff',8);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(player.x,player.y,2.3,0,Math.PI*2);ctx.fill();ctx.restore()}
+ }
+ if(shake>0){shake=Math.max(0,shake-1)}
+ requestAnimationFrame(draw);
+}
+function loop(now){let dt=Math.min(.033,(now-last)/1000||0);last=now;update(dt);requestAnimationFrame(loop)}
+reset();state='title';show(titlePanel);requestAnimationFrame(loop);requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
